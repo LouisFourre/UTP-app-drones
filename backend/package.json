@@ -1,0 +1,14 @@
+{
+  "name": "backend-web-recorder",
+  "version": "1.0.0",
+  "description": "backend for the web app made to record video, gps location and compass orientation for the UTP",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Louis Fourré",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
