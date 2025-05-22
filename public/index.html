@@ -41,7 +41,6 @@
         let videoStream;
         let compassHeading = null;
 
-        // Function to start watching the position
         function startWatchingPosition() {
             if (navigator.geolocation) {
                 watchId = navigator.geolocation.watchPosition(
@@ -64,7 +63,6 @@
             }
         }
 
-        // Function to stop watching the position
         function stopWatchingPosition() {
             if (watchId !== null) {
                 navigator.geolocation.clearWatch(watchId);
@@ -72,7 +70,6 @@
             }
         }
 
-        // Function to start watching the compass heading
         function startWatchingHeading() {
             if (window.DeviceOrientationEvent) {
                 window.addEventListener('deviceorientation', (event) => {
@@ -91,7 +88,6 @@
             }
         }
 
-        // Function to draw video and GPS data on canvas
         function drawVideoAndGPS(video) {
             canvasContext = canvas.getContext('2d');
 
@@ -122,9 +118,12 @@
         startButton.addEventListener('click', async () => {
             // Clear previous positions
             try {
-                videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
 
-                // Créer une vidéo DOM pour le dessin
+                // Create a DOM video that will be used to draw the video on the canvas
                 const video = document.createElement('video');
                 video.srcObject = videoStream;
                 video.play();
@@ -133,7 +132,6 @@
                 startWatchingHeading();
                 drawVideoAndGPS(video);
 
-                // Attendre que la vidéo soit prête AVANT d'enregistrer
                 video.addEventListener('loadedmetadata', () => {
                     const canvasStream = canvas.captureStream(30);
                     const options = { mimeType: 'video/webm; codecs=vp8' };
