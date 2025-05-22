@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Record a video</title>
+    <style>
+        #videoContainer {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        #canvas {
+            width: 100%;
+            background-color: #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Record a video</h1>
+    <button id="startButton">Start recording</button>
+    <button id="stopButton" disabled>Stop recording</button>
+    <div id="videoContainer">
+        <canvas id="canvas"></canvas>
+    </div>
+    <video id="playback" controls width="640" height="480"></video>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const canvas = document.getElementById('canvas');
+        const playback = document.getElementById('playback');
+
+        let mediaRecorder;
+        let recordedBlobs;
+        let positions = [];
+        let compassHeadings = [];
+        let watchId = null;
+        let canvasContext;
+        let videoStream;
+        let compassHeading = null;
+
+        // Function to start watching the position
+        function startWatchingPosition() {
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(
+                    (pos) => {
+                        const position = {
+                            latitude: pos.coords.latitude,
+                            longitude: pos.coords.longitude,
+                            timestamp: pos.timestamp
+                        };
+                        positions.push(position);
+                        console.log('Position:', position);
+                    },
+                    (error) => {
+                        console.error('Error getting position:', error);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+                );
+            } else {
+                console.error('Geolocation is not supported by this browser.');
+            }
+        }
+
+        // Function to stop watching the position
+        function stopWatchingPosition() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+        }
+
+        // Function to start watching the compass heading
+        function startWatchingHeading() {
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', (event) => {
+                    if (event.webkitCompassHeading !== undefined) {
+                        // iOS
+                        compassHeading = event.webkitCompassHeading;
+                    } else if (event.alpha !== null) {
+                        // Android
+                        compassHeading = event.webkitCompassHeading || Math.abs(event.alpha - 360);
+                    }
+                    compassHeadings.push(compassHeading);
+                    console.log('Compass Heading:', compassHeading);
+                });
+            } else {
+                console.error('DeviceOrientation is not supported by this browser.');
+            }
+        }
+
+        // Function to draw video and GPS data on canvas
+        function drawVideoAndGPS(video) {
+            canvasContext = canvas.getContext('2d');
+
+            // Ajuster les dimensions seulement quand la vidéo est prête
+            video.addEventListener('loadedmetadata', () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                function drawFrame() {
+                    if (video.paused || video.ended) return;
+                    canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const position = positions[positions.length - 1];
+                    const heading = compassHeadings[compassHeadings.length - 1];
+                    if (position) {
+                        canvasContext.fillStyle = 'white';
+                        canvasContext.font = '16px Arial';
+                        canvasContext.fillText(
+                            `Lat: ${position.latitude.toFixed(6)}, Long: ${position.longitude.toFixed(6)}, Heading: ${heading ? heading.toFixed(2) : 'N/A'}`,
+                            10, canvas.height - 20
+                        );
+                    }
+                    requestAnimationFrame(drawFrame);
+                }
+                drawFrame();
+            });
+        }
+
+        startButton.addEventListener('click', async () => {
+            // Clear previous positions
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+                // Créer une vidéo DOM pour le dessin
+                const video = document.createElement('video');
+                video.srcObject = videoStream;
+                video.play();
+
+                startWatchingPosition();
+                startWatchingHeading();
+                drawVideoAndGPS(video);
+
+                // Attendre que la vidéo soit prête AVANT d'enregistrer
+                video.addEventListener('loadedmetadata', () => {
+                    const canvasStream = canvas.captureStream(30);
+                    const options = { mimeType: 'video/webm; codecs=vp8' };
+                    mediaRecorder = new MediaRecorder(canvasStream, options);
+                    recordedBlobs = [];
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            recordedBlobs.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const superBuffer = new Blob(recordedBlobs, { type: 'video/webm' });
+                        playback.src = URL.createObjectURL(superBuffer);
+
+                        uploadVideo(superBuffer);
+                    };
+
+                    mediaRecorder.start();
+                    console.log('Recording started...');
+                });
+
+                startButton.disabled = true;
+                stopButton.disabled = false;
+            } catch (error) {
+                console.error('Error accessing media devices.', error);
+            }
+        });
+
+        stopButton.addEventListener('click', () => {
+            mediaRecorder.stop();
+            videoStream.getTracks().forEach(track => track.stop());
+            startButton.disabled = false;
+            stopButton.disabled = true;
+
+            // Stop watching the position
+            stopWatchingPosition();
+        });
+
+        function uploadVideo(blob) {
+            const formData = new FormData();
+            formData.append('video', blob, 'recording.webm');
+            formData.append('positions', JSON.stringify(positions));
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(data => {
+                console.log('Success:', data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html>

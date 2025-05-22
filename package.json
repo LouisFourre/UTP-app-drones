@@ -1,0 +1,23 @@
+{
+  "name": "utp-app-drones",
+  "version": "1.0.0",
+  "description": "Web app made to record video, gps, and compass",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LouisFourre/UTP-app-drones.git"
+  },
+  "author": "Louis Fourré",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/LouisFourre/UTP-app-drones/issues"
+  },
+  "homepage": "https://github.com/LouisFourre/UTP-app-drones#readme",
+  "dependencies": {
+    "express": "^5.1.0",
+    "multer": "^2.0.0"
+  }
+}
